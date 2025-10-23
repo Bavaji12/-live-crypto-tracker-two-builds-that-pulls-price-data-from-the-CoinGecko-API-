@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Portfolio Tracker</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/axios@1.6.0/dist/axios.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #000000; /* Black background */
+      color: #FFFF00; /* Yellow text */
+    }
+    h1, h2 {
+      color: #FFFF00; /* Yellow headers */
+    }
+    .add-token {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    .add-token input {
+      padding: 8px;
+      flex: 1;
+      background-color: #333333; /* Dark gray input background */
+      color: #FFFF00; /* Yellow text in inputs */
+      border: 1px solid #FFFF00; /* Yellow border */
+    }
+    .portfolio ul {
+      list-style: none;
+      padding: 0;
+    }
+    .portfolio li {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      border-bottom: 1px solid #FFFF00; /* Yellow border */
+      background-color: #111111; /* Darker black for list items */
+      margin-bottom: 5px;
+      border-radius: 5px;
+    }
+    .portfolio li span {
+      flex: 1;
+      color: #FFFF00; /* Yellow text */
+    }
+    button {
+      background-color: #FFFF00; /* Yellow button background */
+      color: #000000; /* Black button text */
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    button:hover {
+      background-color: #CCCC00; /* Darker yellow on hover */
+    }
+    .total {
+      font-size: 1.2em;
+      font-weight: bold;
+      margin-top: 20px;
+      text-align: center;
+      background-color: #111111; /* Darker black for total box */
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #FFFF00; /* Yellow border */
+      color: #FFFF00; /* Yellow text */
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [portfolio, setPortfolio] = useState([]); // Array of {id, amount}
+      const [prices, setPrices] = useState({}); // Object of {id: price}
+      const [newToken, setNewToken] = useState('');
+      const [newAmount, setNewAmount] = useState('');
+
+      // Fetch prices for all tokens in portfolio
+      const fetchPrices = async () => {
+        if (portfolio.length === 0) return;
+        const ids = portfolio.map(item => item.id).join(',');
+        try {
+          const response = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+          setPrices(response.data);
+        } catch (error) {
+          console.error('Error fetching prices:', error);
+        }
+      };
+
+      // Add a new token to portfolio
+      const addToken = () => {
+        if (newToken && newAmount > 0) {
+          setPortfolio([...portfolio, { id: newToken.toLowerCase(), amount: parseFloat(newAmount) }]);
+          setNewToken('');
+          setNewAmount('');
+        }
+      };
+
+      // Remove a token from portfolio
+      const removeToken = (id) => {
+        setPortfolio(portfolio.filter(item => item.id !== id));
+      };
+
+      // Calculate total portfolio value
+      const totalValue = portfolio.reduce((sum, item) => {
+        const price = prices[item.id]?.usd || 0;
+        return sum + (item.amount * price);
+      }, 0);
+
+      // Fetch prices on mount and when portfolio changes
+      useEffect(() => {
+        fetchPrices();
+      }, [portfolio]);
+
+      // Auto-refresh prices every 60 seconds
+      useEffect(() => {
+        const interval = setInterval(fetchPrices, 60000);
+        return () => clearInterval(interval);
+      }, [portfolio]);
+
+      return (
+        <div className="App">
+          <h1>Crypto Portfolio Tracker</h1>
+          <div className="add-token">
+            <input
+              type="text"
+              placeholder="Token ID (e.g., bitcoin)"
+              value={newToken}
+              onChange={(e) => setNewToken(e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Amount held"
+              value={newAmount}
+              onChange={(e) => setNewAmount(e.target.value)}
+            />
+            <button onClick={addToken}>Add Token</button>
+          </div>
+          <div className="portfolio">
+            <h2>Your Portfolio</h2>
+            {portfolio.length === 0 ? (
+              <p>No tokens added yet.</p>
+            ) : (
+              <ul>
+                {portfolio.map(item => (
+                  <li key={item.id}>
+                    <span>{item.id.toUpperCase()}: {item.amount} units</span>
+                    <span>Price: ${prices[item.id]?.usd?.toFixed(2) || 'Loading...'}</span>
+                    <span>Value: ${(item.amount * (prices[item.id]?.usd || 0)).toFixed(2)}</span>
+                    <button onClick={() => removeToken(item.id)}>Remove</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="total">Total Portfolio Value: ${totalValue.toFixed(2)}</div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
